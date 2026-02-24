@@ -1,0 +1,11 @@
+extends layout
+
+block content
+  h1 Author: #{author.name}
+
+  h2 Books
+  ul
+    each book in books
+      li
+        a(href=book.url) #{book.title}
+        p #{book.summary}
