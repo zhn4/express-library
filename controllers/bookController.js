@@ -4,6 +4,15 @@ const BookInstance = require('../models/bookinstance')
 
 const asyncHandler = require('express-async-handler')
 
+const Author = require('../models/author')
+
+const Genre = require('../models/genre')
+
+const { body, validationResult } = require('express-validator')
+
+// NOTE: API 变动，废弃
+// const { sanitizeBody } = require('express-validator/filter')
+
 exports.index = asyncHandler(async (req, res, next) => {
   res.send('未实现：网站主页')
 })
@@ -47,14 +56,149 @@ exports.book_detail = asyncHandler(async (req, res, next) => {
 })
 
 // 通过 GET 显示创建图书。
+// exports.book_create_get = asyncHandler(async (req, res, next) => {
+//   res.send('未实现：创建图书 GET')
+// })
+// Display book create form on GET.
 exports.book_create_get = asyncHandler(async (req, res, next) => {
-  res.send('未实现：创建图书 GET')
+  // Get all authors and genres, which we can use for adding to our book.
+  // NOTE: 版本问题，直接使用 Promise.all 处理多个异步查询
+  const [authors, genres] = await Promise.all([Author.find(), Genre.find()])
+
+  if (authors == null || genres == null) {
+    const err = new Error('Author or Genres not found')
+    err.status = 404
+    return next(err)
+  }
+
+  res.render('book_form', {
+    title: 'Create Book',
+    authors,
+    genres,
+  })
 })
 
 // 以 POST 方式处理创建图书。
-exports.book_create_post = asyncHandler(async (req, res, next) => {
-  res.send('未实现：Book 创建 POST')
-})
+// exports.book_create_post = asyncHandler(async (req, res, next) => {
+//   res.send('未实现：Book 创建 POST')
+// })
+// Handle book create on POST.
+exports.book_create_post = [
+  // Convert the genre to an array.
+  (req, res, next) => {
+    if (!(req.body.genre instanceof Array)) {
+      if (typeof req.body.genre === 'undefined') req.body.genre = []
+      else req.body.genre = new Array(req.body.genre)
+    }
+    next()
+  },
+
+  // Validate fields.
+  body('title', 'Title must not be empty.').isLength({ min: 1 }).trim(),
+  body('author', 'Author must not be empty.').isLength({ min: 1 }).trim(),
+  body('summary', 'Summary must not be empty.').isLength({ min: 1 }).trim(),
+  body('isbn', 'ISBN must not be empty').isLength({ min: 1 }).trim(),
+
+  // Sanitize fields (using wildcard).
+  // NOTE: API 变动 start
+  // sanitizeBody('*').trim().escape(),
+  // sanitizeBody('genre.*').escape(),
+  // NOTE: API 变动 end
+  body('*').trim().escape(),
+  body('genre.*').escape(),
+  // Process request after validation and sanitization.
+  async (req, res, next) => {
+    // Extract the validation errors from a request.
+    const errors = validationResult(req)
+
+    // Create a Book object with escaped and trimmed data.
+    const book = new Book({
+      title: req.body.title,
+      author: req.body.author,
+      summary: req.body.summary,
+      isbn: req.body.isbn,
+      genre: req.body.genre,
+    })
+
+    if (!errors.isEmpty()) {
+      // There are errors. Render form again with sanitized values/error messages.
+
+      // Get all authors and genres for form.
+      // NOTE: 语法问题，使用 Promise.all 处理多个异步查询 start
+      // async.parallel(
+      //   {
+      //     authors: function (callback) {
+      //       Author.find(callback)
+      //     },
+      //     genres: function (callback) {
+      //       Genre.find(callback)
+      //     },
+      //   },
+      //   function (err, results) {
+      //     if (err) {
+      //       return next(err)
+      //     }
+
+      //     // Mark our selected genres as checked.
+      //     for (let i = 0; i < results.genres.length; i++) {
+      //       if (book.genre.indexOf(results.genres[i]._id) > -1) {
+      //         results.genres[i].checked = 'true'
+      //       }
+      //     }
+      //     res.render('book_form', {
+      //       title: 'Create Book',
+      //       authors: results.authors,
+      //       genres: results.genres,
+      //       book: book,
+      //       errors: errors.array(),
+      //     })
+      //   },
+      // )
+      // NOTE: 语法问题，使用 Promise.all 处理多个异步查询 end
+      const [authors, genres] = await Promise.all([Author.find(), Genre.find()])
+      if (authors.length == 0) {
+        const err = new Error('Author not found 没有作者')
+        err.status = 404
+        return next(err)
+      }
+      if (genres.length == 0) {
+        const err = new Error('Genre not found 没有分类')
+        err.status = 404
+        return next(err)
+      }
+      // Mark our selected genres as checked.
+      for (let i = 0; i < genres.length; i++) {
+        if (book.genre.indexOf(genres[i]._id) > -1) {
+          genres[i].checked = 'true'
+        }
+      }
+      res.render('book_form', {
+        title: 'Create Book',
+        authors: authors,
+        genres: genres,
+        book: book,
+        errors: errors.array(),
+      })
+      return
+    } else {
+      // NOTE: 语法问题，不支持回调函数，使用链式调用 start
+      // // Data from form is valid. Save book.
+      // book.save(function (err) {
+      //   if (err) {
+      //     return next(err)
+      //   }
+      //   //successful - redirect to new book record.
+      //   res.redirect(book.url)
+      // })
+      // NOTE: 语法问题，不支持回调函数，使用链式调用 end
+      book.save().then(() => {
+        res.redirect(book.url)
+      }).catch((err) => {
+        return next(err)
+      })
+    }
+  },
+]
 
 // 通过 GET 显示删除图书。
 exports.book_delete_get = asyncHandler(async (req, res, next) => {
