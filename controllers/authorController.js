@@ -120,12 +120,116 @@ exports.author_create_post = [
 
 // 由 GET 显示删除作者的表单
 exports.author_delete_get = asyncHandler(async (req, res, next) => {
-  res.send('未实现：删除作者的 GET')
+  // res.send('未实现：删除作者的 GET')
+  // NOTE: 语法过时，使用 Promise.all() 代替 start
+  // async.parallel(
+  //   {
+  //     author: function (callback) {
+  //       Author.findById(req.params.id).exec(callback)
+  //     },
+  //     authors_books: function (callback) {
+  //       Book.find({ author: req.params.id }).exec(callback)
+  //     },
+  //   },
+  //   function (err, results) {
+  //     if (err) {
+  //       return next(err)
+  //     }
+  //     if (results.author == null) {
+  //       // No results.
+  //       res.redirect('/catalog/authors')
+  //     }
+  //     // Successful, so render.
+  //     res.render('author_delete', {
+  //       title: 'Delete Author',
+  //       author: results.author,
+  //       author_books: results.authors_books,
+  //     })
+  //   },
+  // )
+  // NOTE: 语法过时，使用 Promise.all() 代替 end
+  const [author, authors_books] = await Promise.all([
+    Author.findById(req.params.id),
+    Book.find({ author: req.params.id }),
+  ]).catch(err => next(err))
+  if (author == null) {
+    res.redirect('/catalog/authors')
+  }
+  res.render('author_delete', {
+    title: 'Delete Author',
+    author: author,
+    author_books: authors_books,
+  })
 })
 
 // 由 POST 处理作者删除操作
 exports.author_delete_post = asyncHandler(async (req, res, next) => {
-  res.send('未实现：删除作者的 POST')
+  // res.send('未实现：删除作者的 POST')
+  // NOTE: 语法修改 start
+  // async.parallel(
+  //   {
+  //     author: function (callback) {
+  //       Author.findById(req.body.authorid).exec(callback)
+  //     },
+  //     authors_books: function (callback) {
+  //       Book.find({ author: req.body.authorid }).exec(callback)
+  //     },
+  //   },
+  //   function (err, results) {
+  //     if (err) {
+  //       return next(err)
+  //     }
+  //     // Success
+  //     if (results.authors_books.length > 0) {
+  //       // Author has books. Render in same way as for GET route.
+  //       res.render('author_delete', {
+  //         title: 'Delete Author',
+  //         author: results.author,
+  //         author_books: results.authors_books,
+  //       })
+  //       return
+  //     } else {
+  //       // Author has no books. Delete object and redirect to the list of authors.
+  //       Author.findByIdAndRemove(req.body.authorid, function deleteAuthor(err) {
+  //         if (err) {
+  //           return next(err)
+  //         }
+  //         // Success - go to author list
+  //         res.redirect('/catalog/authors')
+  //       })
+  //     }
+  //   },
+  // )
+  // NOTE: 语法修改 end
+  const [author, authors_books] = await Promise.all([
+    Author.findById(req.body.authorid),
+    Book.find({ author: req.body.authorid }),
+  ]).catch(err => next(err))
+  if (authors_books.length > 0) {
+    // Author has books. Render in same way as for GET route.
+    res.render('author_delete', {
+      title: 'Delete Author',
+      author: author,
+      author_books: authors_books,
+    })
+    return
+  } else {
+    // Author has no books. Delete object and redirect to the list of authors.
+    // NOTE: 旧版本语法不适用 start
+    // Author.findByIdAndRemove(req.body.authorid, function deleteAuthor(err) {
+    //   if (err) {
+    //     return next(err)
+    //   }
+    //   // Success - go to author list
+    //   res.redirect('/catalog/authors')
+    // })
+    // NOTE: 旧版本语法不适用 end
+    Author.findByIdAndDelete(req.body.authorid)
+      .then(() => {
+        res.redirect('/catalog/authors')
+      })
+      .catch(err => next(err))
+  }
 })
 
 // 由 GET 显示更新作者的表单
